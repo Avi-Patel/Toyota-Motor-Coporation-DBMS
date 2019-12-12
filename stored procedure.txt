@@ -1,0 +1,123 @@
+--functions
+
+--drop SEQUENCE toyota.seq_invo;
+CREATE SEQUENCE toyota.seq_invo
+    INCREMENT 1
+    START 2019110000301
+    MINVALUE 2019110000001
+    MAXVALUE 9999999999999;
+
+--drop SEQUENCE toyota.seq_trano;
+CREATE SEQUENCE toyota.seq_trano
+    INCREMENT 1
+    START 2019007301
+    MINVALUE 2019007001
+    MAXVALUE 9999999999;
+
+set search_path to toyota;
+--drop SEQUENCE toyota.seq_reg_id;
+CREATE SEQUENCE toyota.seq_reg_id
+    INCREMENT 1
+    START 2019120151
+    MINVALUE 2019120001
+    MAXVALUE 9999999999;
+
+--drop SEQUENCE toyota.seq_ser_id;
+CREATE SEQUENCE toyota.seq_ser_id
+    INCREMENT 1
+    START 2019140051
+    MINVALUE 2019140001
+    MAXVALUE 9999999999;
+
+
+create or replace function auto_ser_id() returns varchar as $$
+select ''||nextval('seq_ser_id')
+$$ language sql ;
+
+create or replace function auto_reg_id() returns varchar as $$
+select ''||nextval('seq_reg_id')
+$$ language sql ;
+
+
+create or replace function auto_invo () returns varchar as $$
+select ''||nextval('seq_invo')
+$$ language sql ;
+
+
+create or replace function auto_trano () returns varchar as $$
+select ''||nextval('seq_trano')
+$$ language sql ;
+
+
+--drop function discout;
+create or replace function discout(show_id varchar(10),co int,pro_id varchar(10))
+returns int As $$
+declare
+	pr int;
+	dis int;
+	ans1 float(2);
+begin
+	select price into pr from product_details where product_id = pro_id and code=co;
+	select discount into dis from offers where offer_id = (select offer_id from showroom where showroom_id = show_id);
+	ans1 = (pr/100.00);
+	ans1 = ans1*dis;
+	return cast(ans1 as int);
+end
+$$ language 'plpgsql';
+
+
+
+
+--drop function  total_amount;
+create or replace function total_amount(show_id varchar(10),co int,pro_id varchar(10)) returns int As $$
+declare
+	pr int;
+	dis int;
+	ans1 float(2);
+begin
+	select price into pr from product_details where product_id = pro_id and code=co;
+	select discount into dis from offers where offer_id = (select offer_id from showroom where showroom_id = show_id);
+	ans1 = (pr/100.00);
+	ans1 = ans1*dis;
+	return cast(pr-ans1 AS int);
+end
+$$ language 'plpgsql';
+
+
+
+
+---pending services
+set search_path to toyota;
+create or replace function pending_services() returns
+table(
+    registration_id varchar(10),
+	customer_id varchar(11)
+)
+as $$
+begin
+        return query execute 'select registration_id,customer_id from registration 
+		where registration_id not in (select registration_id from serviced_by)';
+end
+$$ language 'plpgsql';
+
+--select * from pending_services();
+
+
+
+
+--views
+1)
+create view profit_per_sale as 
+select sales_details.invno,customer.customer_id,customer.customer_name,sales_details.showroom_id,sales_details.code,sales_details.product_id,
+product_details.product_name,product_details.model_type,sales_details.transaction_id,
+payment.total_amount,(payment.total_amount-product_details.unit_price) as profit_per_item from sales_details 
+join product_details on (sales_details.code=product_details.code and
+sales_details.product_id=product_details.product_id) 
+join showroom on (sales_details.showroom_id=showroom.showroom_id)
+join payment on (sales_details.transaction_id=payment.transaction_id)
+join customer on (sales_details.customer_id=customer.customer_id);
+
+
+
+
+

@@ -1,0 +1,119 @@
+Queries:
+
+1) Give all the details of a customer who spend maximum amount in an order.
+select * from customer where customer_id = (select customer_id from payment natural join sales_details 
+where total_amount =( select * from (select max(total_amount) from payment natural join sales_details)) ) ;
+
+ 2) Give all details of customer who gave you maximum profit  amount.
+( *if there are two customers with the same profit select who is most recent)
+
+select * from customer
+where customer_id = (select customer_id from  sales_details
+where invno =( select invno from payment natural join sales_details
+natural join product_details where (total_amount - unit_price)=
+(select  max(total_amount - unit_price)  
+from payment natural join sales_details
+natural join product_details)  order by invdate desc limit 1));
+
+
+
+3) find sales details of car sold in gujarat where car name is ='Toyota Fortuner' with diesel version.
+
+Select sales_details.invno,sales_details.showroom_id,sales_details.code, sales_details.product_id,
+product_details.product_name,Product_details.model_type, sales_details.transaction_id,
+payment.total_amount from sales_details join product_details on (sales_details.code=product_details.code and
+sales_details.product_id=product_details.product_id) join showroom on 
+(sales_details.showroom_id=showroom.showroom_id) join payment on 
+(sales_details.transaction_id=payment.transaction_id) where product_name='Toyota Fortuner' and 
+(model_type='Diesel Automatic version' or model_type='Diesel Manual version') and state='gujarat' order by invno;
+
+4) determine total profit a company has till now.
+select sum(payment.total_amount - product_details.unit_price) as total_profit from sales_details join payment
+on (sales_details.transaction_id=payment.transaction_id)
+join product_details on
+(product_details.code=sales_details.code and product_details.product_id=sales_details.product_id);
+
+
+
+5) Name and contact number of customers who doesn't register for service their product after 1 year of use.
+
+set search_path to toyota;
+select customer_id,customer_name,contact_no
+from customer natural join sales_details
+where current_date - sales_details.invdate > 360 except
+select customer_id,customer_name,contact_no
+From serviced_by  natural join registration  natural join customer ;
+
+
+6) Average time at which customer service their product.(Give answer in days)
+
+select avg(abs(serviced_by.service_date - sales_details.invdate)) 
+from serviced_by  natural join registration natural join sales_details ;
+
+7)find total profit of last 1 month(or 2 month or 3 month) from gujarat;
+select sum(payment.total_amount - product_details.unit_price) as total_profit
+from sales_details join payment
+on (sales_details.transaction_id=payment.transaction_id)
+join product_details on
+(product_details.code=sales_details.code and product_details.product_id=sales_details.product_id)
+join showroom on (showroom.showroom_id=sales_details.showroom_id)
+where sales_details.invdate>=date_trunc('day', NOW() - interval '1 month') and showroom.state='gujarat';
+
+8) find the percentage of products bought by customers using loan or by emi;
+select (select count(sales_details.invno) as cnt from sales_details where sales_details.invno in
+(select invno from loan) or sales_details.transaction_id in (select transaction_id from by_emi))*100 /
+(select count(invno) from sales_details) as percentage_of_products_bought_on_loan_or_emi;
+
+
+
+
+9) profit made by each showroom
+//using view
+select showroom_id,sum(profit_per_item) as profit from profit_per_sale
+group by showroom_id order by showroom_id;
+
+
+10) find the product details which is supplied maximum in quantity from all stockhouse.
+Select product_details.code,product_details.product_id,product_details.product_name ,
+product_details.model_type,product_details.series,price from product_details join
+(select max(maximum.supply_per_product) as max_supply,maximum.code,maximum.product_id from
+(select sum(numofunits) as supply_per_product,code,product_id from supply_details
+group by code,product_id order by code,product_id) as maximum group by code,product_id limit 1)as 
+finl on (finl.code=product_details.code and finl.product_id=product_details.product_id);
+
+
+11)Number of products have been sold by each showroom ?
+
+select showroom_id,showroom_name,count(customer_id)
+ from sales_details natural join showroom
+group by(showroom_id,showroom_name)
+order by count(customer_id) desc;
+
+12) List stockhouse_id,stockhouse_name and remaining capacities for every stockhouse.
+
+select sh_name,stockhouse.sh_id,(stock_capacity-stock) from stockhouse
+join (select sh_id, sum(numofunits) as stock from stocked_in group by sh_id) as abc
+on (abc.sh_id=stockhouse.sh_id);
+
+13) List name,contact number,email, and address of customer who purchased all three types of
+    products from company.
+
+
+	SELECT * FROM customer
+	WHERE customer_id not in (
+	SELECT customer_id FROM (
+	(SELECT customer_id, code FROM (select distinct code from
+	product_details) as p cross join (select distinct customer_id
+	from sales_details) as sp)
+	EXCEPT
+	(SELECT customer_id, code FROM sales_details)
+	) AS r
+	); 
+
+
+
+
+
+
+
+    

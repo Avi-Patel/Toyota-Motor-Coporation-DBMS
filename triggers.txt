@@ -1,0 +1,71 @@
+TRIGGER 1.)
+
+--trigger for auto update of stock and counting of discount and total payment
+set search_path to toyota;
+CREATE FUNCTION  stock_update_in_showroom()
+RETURNS trigger AS $stock_update$
+Declare
+un int;
+trano varchar(10);
+BEGIN
+    select units into un from showroom_has_product where showroom_id = NEW.showroom_id and code=NEW.code and product_id = NEW.product_id;
+    if(un < 1) then
+         raise exception 'this product is unavailable';
+    Else
+     trano = auto_trano();
+	 --raise notice '%',trano;
+ insert into payment values(trano,total_amount(NEW.showroom_id,NEW.code,NEW.product_id));
+    update showroom_has_product set units = units - 1  where showroom_id = NEW.showroom_id   and code=NEW.code and product_id = NEW.product_id;
+    --update sales_details set dicount=1000 where invno=NEW.invno; 
+	NEW.discount=discout(NEW.showroom_id,NEW.code,NEW.product_id);
+	NEW.transaction_id=trano;
+	NEW.invno=auto_invo();
+    end if;
+    return NEW;
+END;
+$stock_update$ LANGUAGE plpgsql;
+
+create TRIGGER stock_update
+    before insert ON sales_details    
+FOR EACH ROW EXECUTE procedure stock_update_in_showroom();
+
+
+
+
+TRIGGER 2).
+--trigger for auto update of stock in stockhouse and showroom for supply
+set search_path to toyota;
+CREATE FUNCTION  stock_update_for_supply()
+RETURNS trigger AS $supply_update$
+Declare 
+un int;
+Begin
+    Select numofunits into un from stocked_in where sh_id=NEW.sh_id and code=NEW.code and product_id=NEW.product_id;
+if(TG_OP='INSERT') then
+    if(un<NEW.numofunits) then 
+        Raise notice 'stock not available';
+    Else
+        update stocked_in set numofunits = un- NEW.numofunits
+		where sh_id = NEW.sh_id and product_id= NEW.product_id and code = NEW.code;
+
+        update showroom_has_product set units = units + NEW.numofunits
+		where showroom_id = NEW.showroom_id and product_id= NEW.product_id and code = NEW.code;
+	End if;
+elseif(TG_OP='UPDATE') then
+	update stocked_in set numofunits = un+ OLD.numofunits-NEW.numofunits
+		where sh_id = NEW.sh_id and product_id= NEW.product_id and code = NEW.code;
+	
+	update showroom_has_product set units = units - OLD.numofunits+NEW.numofunits
+		where showroom_id = NEW.showroom_id and product_id= NEW.product_id and code = NEW.code;
+end if;
+return NEW;
+END;
+
+$supply_update$ 
+LANGUAGE plpgsql;
+
+create TRIGGER supply_update
+    before insert or update ON supply_details    
+FOR EACH ROW EXECUTE procedure stock_update_for_supply();
+
+--insert into supply_details values('2019100001',1,'2019000001','2019200001',current_date,50);

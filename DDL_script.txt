@@ -1,0 +1,204 @@
+﻿create schema TMCDBMS;
+ set search_path to TMCDBMS;
+
+
+  
+create table stockhouse(
+        sh_id varchar(10) primary key,
+        sh_name varchar(50) NOT NULL,
+        stock_capacity int NOT NULL,
+        country varchar(20) NOT NULL,
+        state varchar(20) NOT NULL,
+        city varchar(20) NOT NULL
+);
+
+
+create table product_details(
+        code smallint NOT NULL,
+        product_id varchar(10) NOT NULL,
+        product_name varchar(50) NOT NULL,
+        model_type varchar(50) NOT NULL,
+        series varchar(30),
+        unit_price int NOT NULL,
+        otherdetails text DEFAULT '',
+        price int CHECK (price> unit_price),        
+        primary key(code, product_id)
+);
+
+
+create table offers(
+        offer_id varchar(10) primary key,
+        offer_name varchar(50) NOT NULL,
+        description text,
+        discount int CHECK (discount>0),
+        start_date date NOT NULL,
+        end_date date NOT NULL CHECK(end_date>start_date)
+);
+
+
+create table showroom(
+        showroom_id varchar(10) primary key,
+        showroom_name varchar(30) NOT NULL,
+        country varchar(20) NOT NULL,
+        state varchar(20) NOT NULL,
+        city varchar(20) NOT NULL,
+        offer_id varchar(10) references offers(offer_id)
+);
+
+
+create table stocked_in(
+        sh_id varchar(10) references stockhouse(sh_id),
+        code smallint,
+        product_id varchar(10), 
+        numofunits int DEFAUlt 0,
+        primary key(sh_id, code, product_id),
+        foreign key(code,product_id) references product_details(code,product_id)
+);
+
+
+create table supply_details(
+        sh_id varchar(10),
+        code smallint,
+        product_id varchar(10) ,
+        showroom_id varchar(10) references showroom(showroom_id),
+        suppy_date date NOT NULL DEFAULT CURRENT_DATE,
+        numofunits int CHECK (numofunits>0),
+        primary key(sh_id, code,product_id, showroom_id),
+        foreign key(sh_id,code,product_id) references stocked_in(sh_id,code,product_id)
+);
+
+
+create table showroom_has_product(
+        showroom_id varchar(10) references showroom(showroom_id),
+        code smallint,
+        product_id varchar(10),
+        units int DEFAULT 0,
+        primary key(showroom_id, code, product_id),
+        foreign key(code,product_id) references product_details(code,product_id)
+);
+
+
+create table customer(
+        customer_id varchar(11) primary key,
+        customer_name varchar(30) NOT NULL,
+        email_id varchar(255) NOT NULL CHECK(email_id LIKE '%___@___%'),
+        contact_no varchar(10) NOT NULL CHECK(contact_no not like '%[^0-9]%'),
+        age smallint NOT NULL,
+        address text NOT NULL,
+        sex varchar(1) NOT NULL CHECK(sex in('M','F')),  -- 'M' or 'F'
+        country varchar(20) NOT NULL,
+        state varchar(20) NOT NULL,
+        city varchar(20) NOT NULL,
+        zipcode int
+);
+
+
+create table payment(
+        transaction_id varchar(10) primary key,
+        total_amount int default 0;
+
+
+);
+
+
+create table sales_details(
+        invno varchar(14) primary key,
+        showroom_id varchar(10),
+        code smallint, 
+        product_id varchar(10),
+        invdate date  NOT NULL DEFAULT CURRENT_DATE,
+        discount int default 0,
+        customer_id varchar(11),
+        transaction_id varchar(10) ,
+        foreign key(showroom_id,code,product_id) references  showroom_has_product(showroom_id,code,product_id),
+        foreign key(customer_id) references customer(customer_id),
+        foreign key(transaction_id ) references payment(transaction_id )
+);
+
+
+create table by_cheque(
+        transaction_id varchar(10),
+        cheque_no int NOT NULL,
+        cheque_date date NOT NULL,
+        primary key(transaction_id),
+        foreign key(transaction_id) references payment(transaction_id)
+);
+
+
+create table by_creditcard(
+        transaction_id varchar(10) references payment(transaction_id),
+        creditcard_no varchar(16) NOT NULL,
+        primary key(transaction_id)
+);
+
+
+create table by_debitcard(
+        transaction_id varchar(10) references payment(transaction_id),
+        debitcard_no varchar(16) NOT NULL,
+        primary key(transaction_id)
+);
+
+
+create table by_emi(
+        transaction_id varchar(10) references payment(transaction_id),
+        installment_type varchar(10) CHECK (installment_type in('3 month','4 month','6 month'),
+        installment_amount int CHECK(installment_amount>0),
+        remaining_installments smallint,
+        paid_installments smallint DEFAULT 0,
+        primary key(transaction_id)
+);
+
+
+create table service_center(
+        svc_id varchar(10) primary key,
+        svc_name varchar(30) NOT NULL,
+        country varchar(20) NOT NULL,
+        state varchar(20) NOT NULL,
+        city varchar(20) NOT NULL,
+        zipcode int
+);
+
+
+create table services(
+        service_no smallint primary key,
+        service_name varchar(100) NOT NULL
+);
+
+
+create table services_provided_by_svc(
+        svc_id varchar(10) references service_center(svc_id),
+        service_no smallint references services(service_no)
+);
+
+
+create table registration(
+        registration_id varchar(10) primary key,
+        registration_date date  NOT NULL DEFAULT CURRENT_DATE,
+        service_no smallint references services(service_no),
+        customer_id varchar(11) references customer(customer_id)
+);
+
+
+create table serviced_by(
+        service_id varchar(10) primary key,
+        service_date date NOT NULL DEFAULT CURRENT_DATE,
+        svc_id varchar(10) references service_center(svc_id),
+        registration_id varchar(10) references registration(registration_id)
+);
+
+
+create table loan(
+        loan_id varchar(10) primary key,
+        customer_id varchar(11) references customer(customer_id),
+        invno varchar(14) references sales_details(invno),
+	loan_amount int CHECK (loan_amount >0)
+);
+
+
+create table loan_payment(
+        loan_id varchar(10) references loan(loan_id),
+        payment_no smallint,
+        payment_date date DEFAULT CURRENT_DATE,
+        amount int CHECK (amount>0),
+        primary key(loan_id, payment_no)
+);
